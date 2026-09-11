@@ -4,22 +4,29 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Security.Principal;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace NoNoNo
 {
     public partial class Form1 : Form
     {
+        private const string CURRENT_VERSION = "1.0.1";
+        private const string GITHUB_REPO_URL = "https://github.com/sefaakbulut-cyber/nonono-windows";
+        private const string GITHUB_API_RELEASE_URL = "https://api.github.com/repos/sefaakbulut-cyber/nonono-windows/releases/latest";
+
         private const string DNS_IP = "163.192.96.101";
         private const string DOH_URL = "https://nonono.sefaakbulut.com/dns-query";
         private const string HOSTS_ENTRY = "163.192.96.101 nonono.sefaakbulut.com";
 
-        private string currentLang = "EN"; // Varsayılan dil İngilizce
+        private string currentLang = "EN";
         private bool isCurrentlyActive = false;
 
-        // Log geçmişini çift dilli tutmak için veri yapısı
         private class LogItem
         {
             public DateTime Timestamp { get; set; }
@@ -35,6 +42,7 @@ namespace NoNoNo
         private Button btnDisable = null!;
         private Button btnLang = null!;
         private Button btnInfo = null!;
+        private Button btnGithub = null!;
         private RichTextBox txtLog = null!;
 
         public Form1()
@@ -48,6 +56,7 @@ namespace NoNoNo
 
             InitializeCustomComponents();
             CheckCurrentStatus();
+            _ = CheckForUpdatesAsync();
         }
 
         private bool IsAdmin()
@@ -87,7 +96,7 @@ namespace NoNoNo
                 this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
             catch { }
-            this.Text = "NoNoNo";
+            this.Text = $"NoNoNo v{CURRENT_VERSION}";
             this.Size = new Size(520, 465);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -106,7 +115,7 @@ namespace NoNoNo
             };
             this.Controls.Add(lblStatus);
 
-            // 2. Dil Değiştirme Butonu (Sağ Üst)
+            // 2. Dil Değiştirme Butonu
             btnLang = new Button
             {
                 Location = new Point(415, 15),
@@ -165,20 +174,36 @@ namespace NoNoNo
             };
             this.Controls.Add(txtLog);
 
-            // 6. Teknik Bilgilendirme Butonu (En Alt)
+            // 6. Teknik Bilgilendirme Butonu
             btnInfo = new Button
             {
                 Location = new Point(20, 375),
-                Size = new Size(465, 32),
+                Size = new Size(350, 32),
                 BackColor = Color.FromArgb(22, 27, 34),
                 ForeColor = Color.FromArgb(139, 148, 158),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
                 Cursor = Cursors.Hand
             };
             btnInfo.FlatAppearance.BorderColor = Color.FromArgb(48, 54, 61);
             btnInfo.Click += BtnInfo_Click;
             this.Controls.Add(btnInfo);
+
+            // 7. GitHub Butonu (Güven ve Şeffaflık)
+            btnGithub = new Button
+            {
+                Location = new Point(380, 375),
+                Size = new Size(105, 32),
+                BackColor = Color.FromArgb(33, 38, 45),
+                ForeColor = Color.FromArgb(88, 166, 255),
+                FlatStyle = FlatStyle.Flat,
+                Text = "⭐ GitHub",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnGithub.FlatAppearance.BorderColor = Color.FromArgb(48, 54, 61);
+            btnGithub.Click += BtnGithub_Click;
+            this.Controls.Add(btnGithub);
 
             UpdateLanguageUI();
         }
@@ -187,7 +212,20 @@ namespace NoNoNo
         {
             currentLang = currentLang == "EN" ? "TR" : "EN";
             UpdateLanguageUI();
-            RenderAllLogs(); // Dil değişince ekrandaki logları yeni dilde tekrar yazdır
+            RenderAllLogs();
+        }
+
+        private void BtnGithub_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = GITHUB_REPO_URL,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
         }
 
         private void BtnInfo_Click(object? sender, EventArgs e)
@@ -196,26 +234,54 @@ namespace NoNoNo
             string message = currentLang == "EN"
                 ? "This application configures Windows' native Encrypted DNS (DNS over HTTPS - DoH) feature:\n\n" +
                   "1. Bootstrap Entry (Hosts File):\n" +
-                  "Adds the server domain to the Windows hosts file. This prevents DNS resolution deadlocks (chicken-and-egg problem) before establishing encrypted HTTPS connections.\n\n" +
+                  "Adds the server domain to system hosts file to prevent DNS deadlocks.\n\n" +
                   "2. DNS Cache Flush:\n" +
-                  "Executes 'ipconfig /flushdns' so stale or cached DNS records do not interfere.\n\n" +
+                  "Executes 'ipconfig /flushdns' to clear cached DNS records.\n\n" +
                   "3. Registering DoH Template:\n" +
-                  "Registers the DoH template (https://nonono.sefaakbulut.com/dns-query) into Windows resolver settings via 'netsh' with HTTP/2 protocol support.\n\n" +
+                  "Registers DoH template via 'netsh' with HTTP/2 protocol support.\n\n" +
                   "4. Routing Network Adapters:\n" +
-                  "Routes IPv4 DNS queries on active physical network adapters to the secure server IP (163.192.96.101).\n\n" +
-                  "Result: Your DNS queries are encrypted over HTTPS (Port 443) instead of traditional plain text (Port 53)."
-                : "Bu uygulama Windows'un yerleşik Şifreli DNS (DNS over HTTPS - DoH) özelliğini yapılandırır:\n\n" +
+                  "Routes IPv4 DNS queries on active network adapters to secure server IP (163.192.96.101).\n\n" +
+                  "Source Code: https://github.com/sefaakbulut-cyber/nonono-windows"
+                : "Bu uygulama Windows'un yerleşik Şifreli DNS (DoH) özelliğini yapılandırır:\n\n" +
                   "1. Adres Defteri (Hosts) Tanımlaması:\n" +
-                  "Sunucu alan adını sistem hosts dosyasına ekler. Bu sayede şifreli bağlantı kurulmadan önceki kilitlenme (tavuk-yumurta problemi) engellenir.\n\n" +
+                  "Sunucu alan adını hosts dosyasına ekler.\n\n" +
                   "2. DNS Önbellek Temizliği:\n" +
-                  "'ipconfig /flushdns' çalıştırarak sistemdeki eski çözümlenmiş DNS kayıtlarını temizler.\n\n" +
+                  "'ipconfig /flushdns' çalıştırarak eski çözümlenmiş DNS kayıtlarını temizler.\n\n" +
                   "3. DoH Şablon Kaydı:\n" +
-                  "'netsh' komutuyla DoH şablonunu (https://nonono.sefaakbulut.com/dns-query) Windows 10/11 yerleşik şifreli DNS listesine HTTP/2 protokolüyle kaydeder.\n\n" +
+                  "'netsh' komutuyla DoH şablonunu sisteme HTTP/2 protokolüyle kaydeder.\n\n" +
                   "4. Ağ Bağdaştırıcısı Yönlendirmesi:\n" +
-                  "Aktif fiziksel ağ kartlarının DNS adresini güvenli sunucu IP'sine (163.192.96.101) yönlendirir.\n\n" +
-                  "Sonuç: DNS sorgularınız şifresiz (Port 53) yerine HTTPS (Port 443) üzerinden şifrelenerek sunucuya iletilir.";
+                  "Aktif ağ kartlarının DNS adresini güvenli sunucu IP'sine (163.192.96.101) yönlendirir.\n\n" +
+                  "Kaynak Kodlar: https://github.com/sefaakbulut-cyber/nonono-windows";
 
             MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private async Task CheckForUpdatesAsync()
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", "NoNoNo-App");
+                
+                var response = await client.GetAsync(GITHUB_API_RELEASE_URL);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                    if (doc.RootElement.TryGetProperty("tag_name", out var tagElement))
+                    {
+                        string latestVersion = tagElement.GetString()?.TrimStart('v') ?? "";
+                        if (!string.IsNullOrEmpty(latestVersion) && latestVersion != CURRENT_VERSION)
+                        {
+                            WriteLog(
+                                $"🔔 New version available (v{latestVersion})! Visit GitHub to update.",
+                                $"🔔 Yeni bir sürüm mevcut (v{latestVersion})! Güncellemek için GitHub'ı ziyaret edin.",
+                                "#f2cc60"
+                            );
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         private void UpdateLanguageUI()
@@ -247,107 +313,56 @@ namespace NoNoNo
                 "#f2cc60"
             );
 
-            // 1. Hosts
             UpdateHosts(add: true);
-            WriteLog(
-                "1/4 - Server address defined in system hosts file.",
-                "1/4 - Sunucu adresi sistem adres defterine tanımlandı.",
-                "#8b949e"
-            );
+            WriteLog("1/4 - Server address defined in system hosts file.", "1/4 - Sunucu adresi sistem adres defterine tanımlandı.", "#8b949e");
 
-            // 2. Flush DNS
             RunSilentCommand("ipconfig", "/flushdns");
-            WriteLog(
-                "2/4 - Windows DNS cache flushed and renewed.",
-                "2/4 - Windows DNS önbelleği temizlendi ve yenilendi.",
-                "#8b949e"
-            );
+            WriteLog("2/4 - Windows DNS cache flushed and renewed.", "2/4 - Windows DNS önbelleği temizlendi ve yenilendi.", "#8b949e");
 
-            // 3. DoH Template
             RunSilentCommand("netsh", $"dns add encryption server={DNS_IP} dohtemplate=\"{DOH_URL}\" autoupgrade=yes udpfallback=yes");
-            WriteLog(
-                "3/4 - Win 10/11 native HTTP/2 encrypted DNS (DoH) template registered.",
-                "3/4 - Win 10/11 yerleşik HTTP/2 şifreli DNS (DoH) şablonu sisteme kaydoldu.",
-                "#8b949e"
-            );
+            WriteLog("3/4 - Win 10/11 native HTTP/2 encrypted DNS (DoH) template registered.", "3/4 - Win 10/11 yerleşik HTTP/2 şifreli DNS (DoH) şablonu sisteme kaydoldu.", "#8b949e");
 
-            // 4. Network Adapters
             var adapters = GetTargetAdapterNames();
             if (adapters.Count > 0)
             {
                 foreach (var adapter in adapters)
                 {
                     RunSilentCommand("powershell", $"-Command \"Set-DnsClientServerAddress -InterfaceAlias '{adapter}' -ServerAddresses '{DNS_IP}'\"");
-                    WriteLog(
-                        $"4/4 - [{adapter}] network adapter routed to secure server.",
-                        $"4/4 - [{adapter}] ağ bağdaştırıcısı güvenli sunucuya yönlendirildi.",
-                        "#8b949e"
-                    );
+                    WriteLog($"4/4 - [{adapter}] network adapter routed to secure server.", $"4/4 - [{adapter}] ağ bağdaştırıcısı güvenli sunucuya yönlendirildi.", "#8b949e");
                 }
             }
             else
             {
-                WriteLog(
-                    "No active physical network adapter found.",
-                    "Aktif fiziksel ağ bağdaştırıcısı bulunamadı.",
-                    "#f85149"
-                );
+                WriteLog("No active physical network adapter found.", "Aktif fiziksel ağ bağdaştırıcısı bulunamadı.", "#f85149");
             }
 
             SetStatus(active: true);
-            WriteLog(
-                "Operation Successful! Your internet traffic is now encrypted and protected.",
-                "İşlem Başarılı! İnternet trafiğiniz artık şifreli ve korumalı.",
-                "#2ea44f"
-            );
+            WriteLog("Operation Successful! Your internet traffic is now encrypted and protected.", "İşlem Başarılı! İnternet trafiğiniz artık şifreli ve korumalı.", "#2ea44f");
         }
 
         private void BtnDisable_Click(object? sender, EventArgs e)
         {
             ClearLogHistory();
-            WriteLog(
-                "Disabling Encrypted DNS...",
-                "Şifreli DNS devre dışı bırakılıyor...",
-                "#f2cc60"
-            );
+            WriteLog("Disabling Encrypted DNS...", "Şifreli DNS devre dışı bırakılıyor...", "#f2cc60");
 
-            // 1. Reset Adapters
             var adapters = GetTargetAdapterNames();
             if (adapters.Count > 0)
             {
                 foreach (var adapter in adapters)
                 {
                     RunSilentCommand("powershell", $"-Command \"Set-DnsClientServerAddress -InterfaceAlias '{adapter}' -ResetServerAddresses\"");
-                    WriteLog(
-                        $"1/3 - [{adapter}] network adapter restored to default DNS settings (DHCP).",
-                        $"1/3 - [{adapter}] ağ bağdaştırıcısı varsayılan DNS ayarlarına (DHCP) döndürüldü.",
-                        "#8b949e"
-                    );
+                    WriteLog($"1/3 - [{adapter}] network adapter restored to default DNS settings (DHCP).", $"1/3 - [{adapter}] ağ bağdaştırıcısı varsayılan DNS ayarlarına (DHCP) döndürüldü.", "#8b949e");
                 }
             }
 
-            // 2. Hosts Cleanup
             UpdateHosts(add: false);
-            WriteLog(
-                "2/3 - Server entry removed from system hosts file.",
-                "2/3 - Sistem adres defterindeki sunucu kaydı temizlendi.",
-                "#8b949e"
-            );
+            WriteLog("2/3 - Server entry removed from system hosts file.", "2/3 - Sistem adres defterindeki sunucu kaydı temizlendi.", "#8b949e");
 
-            // 3. Flush DNS
             RunSilentCommand("ipconfig", "/flushdns");
-            WriteLog(
-                "3/3 - Windows DNS cache flushed.",
-                "3/3 - Windows DNS önbelleği temizlendi.",
-                "#8b949e"
-            );
+            WriteLog("3/3 - Windows DNS cache flushed.", "3/3 - Windows DNS önbelleği temizlendi.", "#8b949e");
 
             SetStatus(active: false);
-            WriteLog(
-                "Restored to default settings successfully. Encrypted DNS disabled.",
-                "Varsayılan ayarlara başarıyla dönüldü. Şifreli DNS kapatıldı.",
-                "#2ea44f"
-            );
+            WriteLog("Restored to default settings successfully. Encrypted DNS disabled.", "Varsayılan ayarlara başarıyla dönüldü. Şifreli DNS kapatıldı.", "#2ea44f");
         }
 
         private void CheckCurrentStatus()
@@ -360,21 +375,13 @@ namespace NoNoNo
                 if (output.Contains(DNS_IP))
                 {
                     SetStatus(active: true);
-                    WriteLog(
-                        "Current Status: Encrypted DNS (DoH) is active.",
-                        "Mevcut Durum: Şifreli DNS (DoH) şu anda aktif.",
-                        "#2ea44f"
-                    );
+                    WriteLog("Current Status: Encrypted DNS (DoH) is active.", "Mevcut Durum: Şifreli DNS (DoH) şu anda aktif.", "#2ea44f");
                     return;
                 }
             }
 
             SetStatus(active: false);
-            WriteLog(
-                "Current Status: Default DNS is in use (DoH Inactive).",
-                "Mevcut Durum: Varsayılan DNS kullanılıyor (DoH Pasif).",
-                "#8b949e"
-            );
+            WriteLog("Current Status: Default DNS is in use (DoH Inactive).", "Mevcut Durum: Varsayılan DNS kullanılıyor (DoH Pasif).", "#8b949e");
         }
 
         private void SetStatus(bool active)
@@ -458,8 +465,6 @@ namespace NoNoNo
                 return string.Empty;
             }
         }
-
-        // --- DINAMIK DIL DESTEKLI LOG SISTEMI ---
 
         private void ClearLogHistory()
         {

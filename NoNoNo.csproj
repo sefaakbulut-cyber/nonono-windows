@@ -9,5 +9,15 @@
     <AssemblyName>NoNoNo</AssemblyName>
     <RootNamespace>NoNoNo</RootNamespace>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    
+    <!-- Yayıncı Bilgileri ve Sürüm Tanımları -->
+    <Version>1.0.1</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Authors>Sefa Akbulut</Authors>
+    <Company>Sefa Akbulut</Company>
+    <Product>NoNoNo Encrypted DNS</Product>
+    <Description>Windows Encrypted DNS (DoH) Configuration Tool</Description>
   </PropertyGroup>
 </Project>
