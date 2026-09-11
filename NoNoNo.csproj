@@ -11,10 +11,13 @@
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     
-    <!-- Yayıncı Bilgileri ve Sürüm Tanımları -->
+    <!-- Git Commit Hash Uzantısını Devre Dışı Bırakma -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- Yayıncı ve Sürüm Bilgileri -->
     <Version>1.0.1</Version>
-    <FileVersion>1.0.0.0</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
     <Authors>Sefa Akbulut</Authors>
     <Company>Sefa Akbulut</Company>
     <Product>NoNoNo Encrypted DNS</Product>

@@ -269,14 +269,20 @@ namespace NoNoNo
                     using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
                     if (doc.RootElement.TryGetProperty("tag_name", out var tagElement))
                     {
-                        string latestVersion = tagElement.GetString()?.TrimStart('v') ?? "";
-                        if (!string.IsNullOrEmpty(latestVersion) && latestVersion != CURRENT_VERSION)
+                        string latestTag = tagElement.GetString()?.TrimStart('v') ?? "";
+                        
+                        // GitHub'daki sürüm local sürümden YÜKSEKSE uyarı ver
+                        if (Version.TryParse(latestTag, out var latestVersion) && 
+                            Version.TryParse(CURRENT_VERSION, out var currentVersion))
                         {
-                            WriteLog(
-                                $"🔔 New version available (v{latestVersion})! Visit GitHub to update.",
-                                $"🔔 Yeni bir sürüm mevcut (v{latestVersion})! Güncellemek için GitHub'ı ziyaret edin.",
-                                "#f2cc60"
-                            );
+                            if (latestVersion > currentVersion)
+                            {
+                                WriteLog(
+                                    "🔔 A new version is available! Visit sefaakbulut.com/nonono to download the latest version.",
+                                    "🔔 Yeni bir sürüm mevcut! Güncel sürümü indirmek için sefaakbulut.com/nonono adresini ziyaret edin.",
+                                    "#f2cc60"
+                                );
+                            }
                         }
                     }
                 }
