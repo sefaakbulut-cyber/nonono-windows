@@ -5,7 +5,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Security.Principal;
 using System.Text.Json;
@@ -16,9 +15,10 @@ namespace NoNoNo
 {
     public partial class Form1 : Form
     {
-        private const string CURRENT_VERSION = "1.0.1";
+        private const string CURRENT_VERSION = "1.0.2";
         private const string GITHUB_REPO_URL = "https://github.com/sefaakbulut-cyber/nonono-windows";
         private const string GITHUB_API_RELEASE_URL = "https://api.github.com/repos/sefaakbulut-cyber/nonono-windows/releases/latest";
+        private const string DIRECT_DOWNLOAD_URL = "https://github.com/sefaakbulut-cyber/nonono-windows/releases/latest/download/NoNoNo.zip";
 
         private const string DNS_IP = "163.192.96.101";
         private const string DOH_URL = "https://nonono.sefaakbulut.com/dns-query";
@@ -33,6 +33,7 @@ namespace NoNoNo
             public string MessageEN { get; set; } = string.Empty;
             public string MessageTR { get; set; } = string.Empty;
             public string HexColor { get; set; } = "#8b949e";
+            public bool IsLink { get; set; } = false;
         }
 
         private readonly List<LogItem> logHistory = new();
@@ -96,7 +97,9 @@ namespace NoNoNo
                 this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
             catch { }
-            this.Text = $"NoNoNo v{CURRENT_VERSION}";
+            
+            // Pencere Başlığı Sadece "NoNoNo" Olarak Ayarlandı
+            this.Text = "NoNoNo";
             this.Size = new Size(520, 465);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -160,7 +163,7 @@ namespace NoNoNo
             btnDisable.Click += BtnDisable_Click;
             this.Controls.Add(btnDisable);
 
-            // 5. Konsol Ekranı
+            // 5. Konsol Ekranı (Tıklanabilir Link Desteği İle)
             txtLog = new RichTextBox
             {
                 Location = new Point(20, 120),
@@ -170,11 +173,13 @@ namespace NoNoNo
                 BorderStyle = BorderStyle.None,
                 ReadOnly = true,
                 Font = new Font("Consolas", 9.5f),
-                Padding = new Padding(10)
+                Padding = new Padding(10),
+                DetectUrls = true
             };
+            txtLog.LinkClicked += TxtLog_LinkClicked;
             this.Controls.Add(txtLog);
 
-            // 6. Teknik Bilgilendirme Butonu
+            // 6. Hakkında ve Teknik Bilgilendirme Butonu
             btnInfo = new Button
             {
                 Location = new Point(20, 375),
@@ -189,7 +194,7 @@ namespace NoNoNo
             btnInfo.Click += BtnInfo_Click;
             this.Controls.Add(btnInfo);
 
-            // 7. GitHub Butonu (Güven ve Şeffaflık)
+            // 7. GitHub Butonu
             btnGithub = new Button
             {
                 Location = new Point(380, 375),
@@ -206,6 +211,22 @@ namespace NoNoNo
             this.Controls.Add(btnGithub);
 
             UpdateLanguageUI();
+        }
+
+        private void TxtLog_LinkClicked(object? sender, LinkClickedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(e.LinkText))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = e.LinkText,
+                        UseShellExecute = true
+                    });
+                }
+                catch { }
+            }
         }
 
         private void BtnLang_Click(object? sender, EventArgs e)
@@ -230,9 +251,11 @@ namespace NoNoNo
 
         private void BtnInfo_Click(object? sender, EventArgs e)
         {
-            string title = currentLang == "EN" ? "How It Works (Technical Overview)" : "Teknik Çalışma Mantığı";
+            string title = currentLang == "EN" ? "About & Technical Overview" : "Hakkında ve Çalışma Mantığı";
             string message = currentLang == "EN"
-                ? "This application configures Windows' native Encrypted DNS (DNS over HTTPS - DoH) feature:\n\n" +
+                ? $"NoNoNo - Encrypted DNS Tool (v{CURRENT_VERSION})\n" +
+                  $"Developer: Sefa Akbulut\n\n" +
+                  "How it works behind the scenes:\n\n" +
                   "1. Bootstrap Entry (Hosts File):\n" +
                   "Adds the server domain to system hosts file to prevent DNS deadlocks.\n\n" +
                   "2. DNS Cache Flush:\n" +
@@ -242,7 +265,9 @@ namespace NoNoNo
                   "4. Routing Network Adapters:\n" +
                   "Routes IPv4 DNS queries on active network adapters to secure server IP (163.192.96.101).\n\n" +
                   "Source Code: https://github.com/sefaakbulut-cyber/nonono-windows"
-                : "Bu uygulama Windows'un yerleşik Şifreli DNS (DoH) özelliğini yapılandırır:\n\n" +
+                : $"NoNoNo - Şifreli DNS Aracı (v{CURRENT_VERSION})\n" +
+                  $"Geliştirici: Sefa Akbulut\n\n" +
+                  "Teknik Çalışma Mantığı:\n\n" +
                   "1. Adres Defteri (Hosts) Tanımlaması:\n" +
                   "Sunucu alan adını hosts dosyasına ekler.\n\n" +
                   "2. DNS Önbellek Temizliği:\n" +
@@ -271,15 +296,20 @@ namespace NoNoNo
                     {
                         string latestTag = tagElement.GetString()?.TrimStart('v') ?? "";
                         
-                        // GitHub'daki sürüm local sürümden YÜKSEKSE uyarı ver
                         if (Version.TryParse(latestTag, out var latestVersion) && 
                             Version.TryParse(CURRENT_VERSION, out var currentVersion))
                         {
                             if (latestVersion > currentVersion)
                             {
-                                WriteLog(
-                                    "🔔 A new version is available! Visit sefaakbulut.com/nonono to download the latest version.",
-                                    "🔔 Yeni bir sürüm mevcut! Güncel sürümü indirmek için sefaakbulut.com/nonono adresini ziyaret edin.",
+                                WriteLogLink(
+                                    "🔔 A new version is available! To download the latest version ",
+                                    "click here",
+                                    DIRECT_DOWNLOAD_URL,
+                                    ".",
+                                    "🔔 Yeni bir sürüm mevcut! Güncel sürümü indirmek için ",
+                                    "buraya tıklayın",
+                                    DIRECT_DOWNLOAD_URL,
+                                    ".",
                                     "#f2cc60"
                                 );
                             }
@@ -297,14 +327,14 @@ namespace NoNoNo
                 btnEnable.Text = "🛡️ Enable Secure DNS";
                 btnDisable.Text = "⚡ Restore Defaults (Off)";
                 btnLang.Text = "🌐 TR";
-                btnInfo.Text = "ℹ️ How does this app work behind the scenes?";
+                btnInfo.Text = "ℹ️ About & How it works";
             }
             else
             {
                 btnEnable.Text = "🛡️ Güvenli DNS'i Aktif Et";
                 btnDisable.Text = "⚡ Varsayılana Dön (Kapat)";
                 btnLang.Text = "🌐 EN";
-                btnInfo.Text = "ℹ️ Bu program arka planda nasıl çalışıyor?";
+                btnInfo.Text = "ℹ️ Hakkında / Bu uygulama nasıl çalışır?";
             }
 
             SetStatus(isCurrentlyActive);
@@ -313,11 +343,7 @@ namespace NoNoNo
         private void BtnEnable_Click(object? sender, EventArgs e)
         {
             ClearLogHistory();
-            WriteLog(
-                "Encrypted DNS (DoH) activation started...",
-                "Şifreli DNS (DoH) aktifleştirme işlemi başlatıldı...",
-                "#f2cc60"
-            );
+            WriteLog("Encrypted DNS (DoH) activation started...", "Şifreli DNS (DoH) aktifleştirme işlemi başlatıldı...", "#f2cc60");
 
             UpdateHosts(add: true);
             WriteLog("1/4 - Server address defined in system hosts file.", "1/4 - Sunucu adresi sistem adres defterine tanımlandı.", "#8b949e");
@@ -485,7 +511,25 @@ namespace NoNoNo
                 Timestamp = DateTime.Now,
                 MessageEN = messageEN,
                 MessageTR = messageTR,
-                HexColor = hexColor
+                HexColor = hexColor,
+                IsLink = false
+            };
+
+            logHistory.Add(item);
+            AppendLogToUI(item);
+        }
+
+        private void WriteLogLink(string prefixEN, string linkTextEN, string urlEN, string suffixEN,
+                                  string prefixTR, string linkTextTR, string urlTR, string suffixTR,
+                                  string hexColor)
+        {
+            var item = new LogItem
+            {
+                Timestamp = DateTime.Now,
+                MessageEN = $"{prefixEN}{urlEN}{suffixEN}",
+                MessageTR = $"{prefixTR}{urlTR}{suffixTR}",
+                HexColor = hexColor,
+                IsLink = true
             };
 
             logHistory.Add(item);
