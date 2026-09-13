@@ -15,7 +15,7 @@ namespace NoNoNo
 {
     public partial class Form1 : Form
     {
-        private const string CURRENT_VERSION = "1.0.2";
+        private const string CURRENT_VERSION = "1.0.3";
         private const string GITHUB_REPO_URL = "https://github.com/sefaakbulut-cyber/nonono-windows";
         private const string GITHUB_API_RELEASE_URL = "https://api.github.com/repos/sefaakbulut-cyber/nonono-windows/releases/latest";
         private const string DIRECT_DOWNLOAD_URL = "https://github.com/sefaakbulut-cyber/nonono-windows/releases/latest/download/NoNoNo.zip";
@@ -41,7 +41,7 @@ namespace NoNoNo
         private Label lblStatus = null!;
         private Button btnEnable = null!;
         private Button btnDisable = null!;
-        private Button btnLang = null!;
+        private ComboBox cmbLang = null!;
         private Button btnInfo = null!;
         private Button btnGithub = null!;
         private RichTextBox txtLog = null!;
@@ -60,6 +60,7 @@ namespace NoNoNo
             _ = CheckForUpdatesAsync();
         }
 
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private bool IsAdmin()
         {
             using var identity = WindowsIdentity.GetCurrent();
@@ -67,6 +68,7 @@ namespace NoNoNo
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private void ElevateAndRestart()
         {
             try
@@ -98,7 +100,6 @@ namespace NoNoNo
             }
             catch { }
             
-            // Pencere Başlığı Sadece "NoNoNo" Olarak Ayarlandı
             this.Text = "NoNoNo";
             this.Size = new Size(520, 465);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -110,7 +111,7 @@ namespace NoNoNo
             lblStatus = new Label
             {
                 Location = new Point(20, 15),
-                Size = new Size(385, 35),
+                Size = new Size(375, 35),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleCenter,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -118,20 +119,22 @@ namespace NoNoNo
             };
             this.Controls.Add(lblStatus);
 
-            // 2. Dil Değiştirme Butonu
-            btnLang = new Button
+            // 2. Dil Seçim Drop-Down Menüsü (ComboBox)
+            cmbLang = new ComboBox
             {
-                Location = new Point(415, 15),
-                Size = new Size(70, 35),
+                Location = new Point(405, 15),
+                Size = new Size(80, 35),
                 BackColor = Color.FromArgb(33, 38, 45),
                 ForeColor = Color.FromArgb(88, 166, 255),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Cursor = Cursors.Hand
             };
-            btnLang.FlatAppearance.BorderColor = Color.FromArgb(48, 54, 61);
-            btnLang.Click += BtnLang_Click;
-            this.Controls.Add(btnLang);
+            cmbLang.Items.AddRange(new object[] { "🌐 EN", "🌐 TR" });
+            cmbLang.SelectedIndex = 0; // Varsayılan EN
+            cmbLang.SelectedIndexChanged += CmbLang_SelectedIndexChanged;
+            this.Controls.Add(cmbLang);
 
             // 3. Aktif Et Butonu
             btnEnable = new Button
@@ -163,7 +166,7 @@ namespace NoNoNo
             btnDisable.Click += BtnDisable_Click;
             this.Controls.Add(btnDisable);
 
-            // 5. Konsol Ekranı (Tıklanabilir Link Desteği İle)
+            // 5. Konsol Ekranı
             txtLog = new RichTextBox
             {
                 Location = new Point(20, 120),
@@ -213,6 +216,17 @@ namespace NoNoNo
             UpdateLanguageUI();
         }
 
+        private void CmbLang_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            string newLang = cmbLang.SelectedIndex == 1 ? "TR" : "EN";
+            if (currentLang != newLang)
+            {
+                currentLang = newLang;
+                UpdateLanguageUI();
+                RenderAllLogs();
+            }
+        }
+
         private void TxtLog_LinkClicked(object? sender, LinkClickedEventArgs e)
         {
             if (!string.IsNullOrEmpty(e.LinkText))
@@ -227,13 +241,6 @@ namespace NoNoNo
                 }
                 catch { }
             }
-        }
-
-        private void BtnLang_Click(object? sender, EventArgs e)
-        {
-            currentLang = currentLang == "EN" ? "TR" : "EN";
-            UpdateLanguageUI();
-            RenderAllLogs();
         }
 
         private void BtnGithub_Click(object? sender, EventArgs e)
@@ -255,19 +262,23 @@ namespace NoNoNo
             string message = currentLang == "EN"
                 ? $"NoNoNo - Encrypted DNS Tool (v{CURRENT_VERSION})\n" +
                   $"Developer: Sefa Akbulut\n\n" +
-                  "How it works behind the scenes:\n\n" +
+                  "🛡️ Strict No-Log Privacy Policy:\n" +
+                  "No DNS queries, IP addresses, or personal data are ever logged or stored on our servers for maximum user privacy.\n\n" +
+                  "Technical Workflow:\n" +
                   "1. Bootstrap Entry (Hosts File):\n" +
-                  "Adds the server domain to system hosts file to prevent DNS deadlocks.\n\n" +
+                  "Adds server domain to system hosts file to prevent DNS resolution deadlocks.\n\n" +
                   "2. DNS Cache Flush:\n" +
                   "Executes 'ipconfig /flushdns' to clear cached DNS records.\n\n" +
                   "3. Registering DoH Template:\n" +
-                  "Registers DoH template via 'netsh' with HTTP/2 protocol support.\n\n" +
+                  "Registers DoH template via 'netsh' with native HTTP/2 protocol support.\n\n" +
                   "4. Routing Network Adapters:\n" +
                   "Routes IPv4 DNS queries on active network adapters to secure server IP (163.192.96.101).\n\n" +
                   "Source Code: https://github.com/sefaakbulut-cyber/nonono-windows"
                 : $"NoNoNo - Şifreli DNS Aracı (v{CURRENT_VERSION})\n" +
                   $"Geliştirici: Sefa Akbulut\n\n" +
-                  "Teknik Çalışma Mantığı:\n\n" +
+                  "🛡️ Sıfır Log (No-Log) Gizlilik İlkemiz:\n" +
+                  "Kullanıcı gizliliği gereği sunucularımızda hiçbir DNS sorgusu, IP adresi veya kişisel veri kaydedilmez ve saklanmaz.\n\n" +
+                  "Teknik Çalışma Mantığı:\n" +
                   "1. Adres Defteri (Hosts) Tanımlaması:\n" +
                   "Sunucu alan adını hosts dosyasına ekler.\n\n" +
                   "2. DNS Önbellek Temizliği:\n" +
@@ -326,14 +337,12 @@ namespace NoNoNo
             {
                 btnEnable.Text = "🛡️ Enable Secure DNS";
                 btnDisable.Text = "⚡ Restore Defaults (Off)";
-                btnLang.Text = "🌐 TR";
                 btnInfo.Text = "ℹ️ About & How it works";
             }
             else
             {
                 btnEnable.Text = "🛡️ Güvenli DNS'i Aktif Et";
                 btnDisable.Text = "⚡ Varsayılana Dön (Kapat)";
-                btnLang.Text = "🌐 EN";
                 btnInfo.Text = "ℹ️ Hakkında / Bu uygulama nasıl çalışır?";
             }
 
